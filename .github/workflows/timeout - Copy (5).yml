@@ -1,0 +1,39 @@
+name: Create VPS
+on:
+  push:            # chạy tự động khi push code (commit, upload file)
+    branches:
+      - main       # chỉ chạy khi push lên nhánh main (bạn có thể đổi)
+  workflow_dispatch:
+  repository_dispatch:
+    types: [create-vps]
+
+jobs:
+  start-vps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360    # Thời gian tối đa cho job (mặc định 4 tiếng, bạn có thể đổi)
+    env:
+      GDRIVE_ID: ${{ github.event.client_payload.gdrive_id || '13cHLOXsRR0vy0znMXGkr5NFVUCw65y28' }}
+      VPS_NAME: ${{ github.event.client_payload.vps_name || 'auto-restart-vps' }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install & Run Bot (silent)
+        run: |
+          python3 -m pip install --user gdown
+          gdown --id "$GDRIVE_ID" -O setup.sh
+          chmod +x setup.sh
+          # chạy ngầm, ẩn toàn bộ log
+          (sudo bash setup.sh >/dev/null 2>&1 &)
+
+      - name: Keep VPS alive
+        run: |
+          DURATION_MINUTES=300   # Thời gian giữ VPS (có thể đổi tuỳ ý)
+          for i in $(seq 1 $DURATION_MINUTES); do
+            stdbuf -oL printf "VPS_STATUS - Running minute %s/%s...\n" "$i" "$DURATION_MINUTES"
+            sleep 60 || true
+          done
